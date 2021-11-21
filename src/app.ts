@@ -1,71 +1,90 @@
-import express from "express";
-const MongoClient = require('mongodb').MongoClient;
+import express, { Request, Response } from "express";
+import { model } from "mongoose";
+import { CustomerSchema } from "./models/Customer";
+import "./database"
+import { ObjectId } from "bson";
+
+interface Customer {
+    name: String;
+    email: String;
+    age: Number;
+    games: [{
+        name: String;
+        developer: String;
+        price: Number;
+    }]
+}
 
 const app = express();
 
 app.use(express.json());
 
-const uri = "mongodb://localhost:27017";
+app.post("/user", async (request: Request, response: Response) => {
+    const { name, email, age, games } = request.body;
 
-MongoClient.connect(uri, (err, client) => {
-    if(err) return console.log("Deu erro!");
+    const customerModel = model<Customer>("customers", CustomerSchema);
 
-    const database = client.db("user");
+    const alreadyExistCustomer = await customerModel.findOne({ email })
 
-    const users = database.collection("data");
+    if(alreadyExistCustomer) {
+        return response.json("Customer exist!");
+    }
 
-    app.post("/user", async (request, response) => {
-        const { name, age } = request.body;
-
-        const result = await users.insertOne({
-            name,
-            age
-        });
-
-        return response.json(result);
+    const customer = await customerModel.create({
+        name,
+        email,
+        age,
+        games
     });
 
-    app.get("/user", async (request, response) => {
-        const result = await users.findOne(
-            { name: "Gabriel Ribeiro Santos"},
-            {
-                sort: { rating: -1 }
-            }
-        );
+    customer.save();
 
-        return response.json(result);
+    return response.json(customer);
+});
+
+app.get("/user", async (request, response) => {
+    const customerModel = model<Customer>("customers", CustomerSchema);
+
+    const customer = await customerModel.find();
+
+    return response.json(customer);
+});
+
+app.put("/user", async (request, response) => {
+    const { name, email, age, games } = request.body;
+
+    const customerModel = model<Customer>("customers", CustomerSchema);
+
+    const alreadyExistCustomer = await customerModel.findOne({ email });
+
+    if(!alreadyExistCustomer) {
+        return response.json("Customer not exist!");
+    }
+
+    const customer = await customerModel.updateOne({ email }, {
+        name,
+        email,
+        age,
+        games
     });
 
-    app.put("/user", async (request, response) => {
-        const { name } = request.body;
+    return response.json(customer);
+});
 
-        const result = await users.updateOne(
-            { age: 18 },
-            {
-                $set: {
-                    name
-                },
-            },
-            { upsert: true }
-        );
+app.delete("/user/:id", async (request, response) => {
+    const { id } = request.params;
 
-        return response.json(result)
-    });
+    const customerModel = model<Customer>("customers", CustomerSchema);
 
-    app.delete("/user/:age", async (request, response) => {
-        const { age } = request.params;
+    const alreadyExistCustomer = await customerModel.findOne({ id });
 
-        const query = { age: Number(age) };
-        console.log(query);
+    if(!alreadyExistCustomer) {
+        return response.json("Customer not exist!");
+    }
 
-        const result = await users.deleteOne(query);
+    await customerModel.deleteOne({ _id: new ObjectId(id) });
 
-        if(result.deletedCount === 1) {
-            return response.json("Deleted 1 documents");
-        } else {
-            return response.json("Deleted 0 documents");
-        }
-    });
+    return response.json("Customer deleted!")
 });
 
 app.listen(3000, () => console.log("Connected server (express)"));
