@@ -2,7 +2,6 @@ import express, { Request, Response } from "express";
 import { model } from "mongoose";
 import { CustomerSchema } from "./models/Customer";
 import "./database"
-import { ObjectId } from "bson";
 
 interface Customer {
     name: String;
@@ -71,8 +70,8 @@ app.put("/user", async (request, response) => {
     return response.json(customer);
 });
 
-app.delete("/user/:id", async (request, response) => {
-    const { id } = request.params;
+app.delete("/user", async (request, response) => {
+    const { id } = request.body;
 
     const customerModel = model<Customer>("customers", CustomerSchema);
 
@@ -82,7 +81,7 @@ app.delete("/user/:id", async (request, response) => {
         return response.json("Customer not exist!");
     }
 
-    await customerModel.deleteOne({ _id: new ObjectId(id) });
+    await customerModel.findOneAndDelete({ _id: id });
 
     return response.json("Customer deleted!")
 });
